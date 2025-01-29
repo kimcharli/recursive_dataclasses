@@ -1,0 +1,80 @@
+[project]
+name = "recursive-dataclasses"
+version = "0.1.0"
+description = "A Python library for recursively loading and updating dataclasses from nested dictionaries"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+dependencies = [
+    "typing-extensions>=4.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "tox>=4.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra -q --cov=recursive_dataclasses"
+
+[tool.coverage.run]
+source = ["recursive_dataclasses"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+min_version = 4.0
+env_list = 
+    py311
+    py312
+    type
+    lint
+
+[testenv]
+description = run unit tests
+deps = 
+    pytest>=7.0.0
+    pytest-cov>=4.0.0
+commands =
+    pytest {posargs:tests}
+
+[testenv:type]
+description = run type checks
+deps = 
+    mypy>=1.0.0
+commands =
+    mypy recursive_dataclasses
+
+[testenv:lint]
+description = run linters
+skip_install = true
+deps =
+    black>=22.0.0
+    ruff>=0.1.0
+commands =
+    black {posargs:recursive_dataclasses tests}
+    ruff check {posargs:recursive_dataclasses tests}
+"""
