@@ -1,97 +1,124 @@
+from typing import Optional, List, Dict
 from dataclasses import dataclass
-from typing import List, Dict
-from recursive_dataclasses import from_dict, update_dataclass
+import pytest
+
+from recursive_dataclasses import RecursiveDataclass
 
 
 @dataclass
-class Address:
-    street: str = ""
-    city: str = ""
-    country: str = ""
+class Address(RecursiveDataclass):
+    street: str
+    city: str
+    country: str
+    postal_code: Optional[str] = None
 
 
 @dataclass
-class Contact:
-    email: str = ""
-    phone: str = ""
+class Contact(RecursiveDataclass):
+    email: str
+    phone: Optional[str] = None
 
 
 @dataclass
-class Person:
-    name: str = ""
-    age: int = 0
-    address: Address = None
-    contacts: List[Contact] = None
-    metadata: Dict[str, str] = None
+class Person(RecursiveDataclass):
+    name: str
+    age: int
+    addresses: Dict[str, Address]
+    contacts: List[Contact]
+    notes: Optional[str] = None
+
+
+def test_simple_dataclass():
+    """Test basic dataclass functionality."""
+    address = Address(
+        street="123 Main St", city="New York", country="USA", postal_code="10001"
+    )
+
+    # Test to_dict
+    address_dict = address.to_dict()
+    assert address_dict["street"] == "123 Main St"
+    assert address_dict["city"] == "New York"
+    assert address_dict["country"] == "USA"
+    assert address_dict["postal_code"] == "10001"
+    assert address_dict["__type__"] == "Address"
+
+    # Test from_dict
+    new_address = Address.from_dict(address_dict)
+    assert new_address.street == "123 Main St"
+    assert new_address.city == "New York"
+    assert new_address.country == "USA"
+    assert new_address.postal_code == "10001"
+
+
+def test_optional_fields():
+    """Test handling of optional fields."""
+    # Test with all fields
+    contact1 = Contact(email="test@example.com", phone="+1-555-555-5555")
+    assert contact1.phone == "+1-555-555-5555"
+
+    # Test without optional field
+    contact2 = Contact(email="test@example.com")
+    assert contact2.phone is None
+
+    # Test conversion to/from dict
+    contact_dict = contact2.to_dict()
+    assert contact_dict["phone"] is None
+
+    new_contact = Contact.from_dict(contact_dict)
+    assert new_contact.phone is None
 
 
 def test_nested_dataclass():
-    # Test data
-    data = {
+    """Test nested dataclass structures."""
+    person_data = {
         "name": "John Doe",
         "age": 30,
-        "address": {"street": "123 Main St", "city": "New York", "country": "USA"},
+        "addresses": {
+            "home": {
+                "street": "123 Main St",
+                "city": "New York",
+                "country": "USA",
+                "postal_code": "10001",
+            },
+            "work": {
+                "street": "456 Business Ave",
+                "city": "Manhattan",
+                "country": "USA",
+                "postal_code": "10002",
+            },
+        },
         "contacts": [
-            {"email": "john@example.com", "phone": "123-456-7890"},
-            {"email": "john.doe@work.com", "phone": "098-765-4321"},
+            {"email": "john@example.com", "phone": "+1-555-555-5555"},
+            {"email": "john.doe@work.com"},
         ],
-        "metadata": {"department": "Engineering", "role": "Developer"},
+        "notes": "Test notes",
     }
 
-    # Test from_dict function
-    person = from_dict(Person, data)
-
-    # Verify the data
+    # Test from_dict with nested structure
+    person = Person.from_dict(person_data)
     assert person.name == "John Doe"
     assert person.age == 30
-    assert isinstance(person.address, Address)
-    assert person.address.street == "123 Main St"
-    assert person.address.city == "New York"
-    assert isinstance(person.contacts, list)
+    assert len(person.addresses) == 2
+    assert person.addresses["home"].street == "123 Main St"
+    assert person.addresses["work"].city == "Manhattan"
     assert len(person.contacts) == 2
-    assert isinstance(person.contacts[0], Contact)
     assert person.contacts[0].email == "john@example.com"
-    assert isinstance(person.metadata, dict)
-    assert person.metadata["department"] == "Engineering"
+    assert person.contacts[1].phone is None
 
-    # Test updating existing instance
-    update_data = {
-        "age": 31,
-        "address": {"city": "Boston"},
-        "contacts": [{"email": "new@example.com", "phone": "555-555-5555"}],
-    }
-
-    # Test update_dataclass function
-    person = update_dataclass(person, update_data)
-
-    # Verify updates
-    assert person.age == 31
-    assert person.address.city == "Boston"
-    # Original data should be preserved when not updated
-    assert person.address.street == "123 Main St"
-    assert person.contacts[0].email == "new@example.com"
-
-    # Test None handling
-    null_data = {"address": None, "contacts": None, "metadata": None}
-    person = update_dataclass(person, null_data)
-    assert person.address is None
-    assert person.contacts is None
-    assert person.metadata is None
-
-    # Test error handling
-    try:
-        update_dataclass("not a dataclass", {})
-        assert False, "Should raise TypeError"
-    except TypeError:
-        pass
-
-    try:
-        update_dataclass(person, "not a dict")
-        assert False, "Should raise TypeError"
-    except TypeError:
-        pass
+    # Test to_dict with nested structure
+    person_dict = person.to_dict()
+    assert person_dict["name"] == "John Doe"
+    assert person_dict["addresses"]["home"]["street"] == "123 Main St"
+    assert person_dict["contacts"][0]["phone"] == "+1-555-555-5555"
+    assert person_dict["contacts"][1]["phone"] is None
 
 
-if __name__ == "__main__":
-    test_nested_dataclass()
-    print("All tests passed!")
+def test_validation():
+    """Test input validation."""
+    # Test invalid input type
+    with pytest.raises(TypeError, match="Expected dict"):
+        Address.from_dict("not a dict")
+
+    # Test missing required field
+    with pytest.raises(ValueError, match="Missing required field"):
+        Address.from_dict({"city": "New York", "country": "USA"})

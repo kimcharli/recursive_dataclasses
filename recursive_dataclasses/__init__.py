@@ -1,171 +1,161 @@
-from dataclasses import fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, MISSING
 from typing import (
     Any,
     Dict,
     Type,
     TypeVar,
     get_type_hints,
-    Mapping,
-    Generic,
-    List,
-    TypeGuard,
-    Protocol,
+    Union,
+    get_args,
+    get_origin,
+    ClassVar,
     cast,
-    TypeAlias,
-    runtime_checkable,
 )
-from typing_extensions import get_origin, get_args
 
-T = TypeVar("T")
-
-
-@runtime_checkable
-class DataclassProtocol(Protocol):
-    """Protocol for dataclass instances."""
-
-    __dataclass_fields__: Dict[str, Any]
+T = TypeVar("T", bound="RecursiveDataclass")
 
 
-DataclassType: TypeAlias = Type[DataclassProtocol]
-DataclassInstance: TypeAlias = DataclassProtocol
+@dataclass
+class RecursiveDataclass:
+    """A base class for dataclasses that can be recursively converted to/from dictionaries."""
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the dataclass instance to a dictionary."""
+        result: Dict[str, Any] = {}
+        type_hints = get_type_hints(self.__class__)
 
-def is_dataclass_type(cls: Any) -> TypeGuard[DataclassType]:
-    """Type guard to check if a class is a dataclass."""
-    return isinstance(cls, type) and is_dataclass(cls)
+        for field in fields(self.__class__):  # type: ignore
+            value = getattr(self, field.name)
+            field_type = type_hints.get(field.name, Any)
 
-
-def is_dataclass_instance(obj: Any) -> TypeGuard[DataclassInstance]:
-    """Type guard to check if an object is a dataclass instance."""
-    return is_dataclass(obj) and not isinstance(obj, type)
-
-
-class DataclassUpdater(Generic[T]):
-    """Helper class for updating dataclass instances."""
-
-    @staticmethod
-    def update(instance: T, data: Dict[str, Any]) -> T:
-        """
-        Recursively update a dataclass instance with values from a dictionary.
-
-        Args:
-            instance: A dataclass instance to update
-            data: A dictionary containing the values to update with
-
-        Returns:
-            Updated dataclass instance
-        """
-        if not is_dataclass_instance(instance):
-            raise TypeError("Instance must be a dataclass instance")
-        if not isinstance(data, Mapping):
-            raise TypeError("Data must be a mapping (dict-like object)")
-
-        type_hints = get_type_hints(instance.__class__)
-
-        for field in fields(instance):
-            field_name = field.name
-            if field_name not in data:
+            # Skip ClassVar fields
+            if get_origin(field_type) is ClassVar:
                 continue
-
-            field_value = data[field_name]
-            field_type = type_hints[field_name]
 
             # Handle None values
-            if field_value is None:
-                setattr(instance, field_name, None)
+            if value is None:
+                result[field.name] = None
                 continue
 
-            origin_type = get_origin(field_type) or field_type
+            # Handle Union/Optional types
+            if get_origin(field_type) is Union:
+                field_args = get_args(field_type)
+                if type(None) in field_args:
+                    # This is an Optional type
+                    field_type = next(t for t in field_args if t is not type(None))
 
-            if is_dataclass_type(origin_type):
-                # Handle nested dataclass
-                if field_value is not None:
-                    current_value = getattr(instance, field_name)
-                    if current_value is None:
-                        current_value = origin_type()
-                    updated_value = DataclassUpdater[Any].update(
-                        current_value, field_value
-                    )
-                    setattr(instance, field_name, updated_value)
+            # Handle nested dataclasses
+            if is_dataclass(type(value)):
+                if isinstance(value, RecursiveDataclass):
+                    result[field.name] = value.to_dict()
                 else:
-                    setattr(instance, field_name, field_value)
+                    result[field.name] = {k: v for k, v in value.__dict__.items()}
 
-            elif origin_type in (list, tuple, set):
-                # Handle collections
-                item_type = get_args(field_type)[0]
-                if is_dataclass_type(item_type):
-                    # Handle collection of dataclasses
-                    current_items: List[Any] = []
-                    for item in field_value:
-                        if item is None:
-                            current_items.append(None)
-                        else:
-                            new_instance = item_type()
-                            updated_instance = DataclassUpdater[Any].update(
-                                new_instance, item
-                            )
-                            current_items.append(updated_instance)
-                    setattr(instance, field_name, origin_type(current_items))
-                else:
-                    # Handle collection of simple types
-                    setattr(instance, field_name, origin_type(field_value))
+            # Handle dictionaries of dataclasses
+            elif isinstance(value, dict):
+                result[field.name] = {
+                    k: v.to_dict()
+                    if isinstance(v, RecursiveDataclass)
+                    else {k2: v2 for k2, v2 in v.__dict__.items()}
+                    if is_dataclass(type(v))
+                    else v
+                    for k, v in value.items()
+                }
 
-            elif origin_type is dict:
-                # Handle dictionaries
-                key_type, value_type = get_args(field_type)
-                if is_dataclass_type(value_type):
-                    # Handle dict with dataclass values
-                    current_dict: Dict[Any, Any] = {}
-                    for k, v in field_value.items():
-                        if v is None:
-                            current_dict[k] = None
-                        else:
-                            new_instance = value_type()
-                            updated_instance = DataclassUpdater[Any].update(
-                                new_instance, v
-                            )
-                            current_dict[k] = updated_instance
-                    setattr(instance, field_name, current_dict)
-                else:
-                    # Handle dict with simple types
-                    setattr(instance, field_name, field_value)
+            # Handle lists/tuples of dataclasses
+            elif isinstance(value, (list, tuple)):
+                result[field.name] = [
+                    v.to_dict()
+                    if isinstance(v, RecursiveDataclass)
+                    else {k: v2 for k, v2 in v.__dict__.items()}
+                    if is_dataclass(type(v))
+                    else v
+                    for v in value
+                ]
 
+            # Handle basic types
             else:
-                # Handle simple types
-                setattr(instance, field_name, field_value)
+                result[field.name] = value
 
-        return instance
+        # Add type information
+        result["__type__"] = self.__class__.__name__
+        return result
 
+    @classmethod
+    def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
+        """Create a new instance from a dictionary."""
+        if not isinstance(data, dict):
+            raise TypeError(f"Expected dict, got {type(data)}")
 
-def update_dataclass(instance: T, data: Dict[str, Any]) -> T:
-    """
-    Recursively update a dataclass instance with values from a dictionary.
+        field_values: Dict[str, Any] = {}
+        type_hints = get_type_hints(cls)
 
-    Args:
-        instance: A dataclass instance to update
-        data: A dictionary containing the values to update with
+        for field in fields(cls):  # type: ignore
+            if field.name not in data:
+                if field.default is MISSING and field.default_factory is MISSING:  # type: ignore
+                    raise ValueError(f"Missing required field {field.name}")
+                continue
 
-    Returns:
-        Updated dataclass instance
-    """
-    if not is_dataclass(instance):
-        raise TypeError("Instance must be a dataclass")
-    return cast(T, DataclassUpdater[Any].update(instance, data))
+            value = data[field.name]
+            if value is None:
+                field_values[field.name] = None
+                continue
 
+            field_type = type_hints.get(field.name, Any)
 
-def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
-    """
-    Create a new dataclass instance from a dictionary.
+            # Handle Union/Optional types
+            if get_origin(field_type) is Union:
+                field_args = get_args(field_type)
+                if type(None) in field_args:
+                    # This is an Optional type
+                    field_type = next(t for t in field_args if t is not type(None))
 
-    Args:
-        cls: The dataclass type to create
-        data: A dictionary containing the values to create the dataclass with
+            # Handle nested dataclasses
+            if is_dataclass(field_type):
+                field_type = cast(
+                    Type[Any], field_type
+                )  # Help mypy understand this is a type
+                if issubclass(field_type, RecursiveDataclass):
+                    field_values[field.name] = field_type.from_dict(value)
+                else:
+                    field_values[field.name] = field_type(**value)
 
-    Returns:
-        New dataclass instance
-    """
-    if not is_dataclass(cls):
-        raise TypeError("Class must be a dataclass")
+            # Handle dictionaries
+            elif get_origin(field_type) is dict:
+                key_type, val_type = get_args(field_type)
+                if is_dataclass(val_type):
+                    val_type = cast(
+                        Type[Any], val_type
+                    )  # Help mypy understand this is a type
+                    if issubclass(val_type, RecursiveDataclass):
+                        field_values[field.name] = {
+                            k: val_type.from_dict(v) for k, v in value.items()
+                        }
+                    else:
+                        field_values[field.name] = {
+                            k: val_type(**v) for k, v in value.items()
+                        }
+                else:
+                    field_values[field.name] = value
 
-    instance = cls()
-    return update_dataclass(instance, data)
+            # Handle lists/tuples
+            elif get_origin(field_type) in (list, tuple):
+                item_type = get_args(field_type)[0]
+                if is_dataclass(item_type):
+                    item_type = cast(
+                        Type[Any], item_type
+                    )  # Help mypy understand this is a type
+                    if issubclass(item_type, RecursiveDataclass):
+                        field_values[field.name] = [
+                            item_type.from_dict(item) for item in value
+                        ]
+                    else:
+                        field_values[field.name] = [item_type(**item) for item in value]
+                else:
+                    field_values[field.name] = value
+
+            # Handle basic types
+            else:
+                field_values[field.name] = value
+
+        return cls(**field_values)

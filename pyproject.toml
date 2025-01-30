@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-    { name = "Your Name", email = "your.email@example.com" }
+    { name = "Charlie Kim", email = "kimcharli@gmail.com" }
 ]
 dependencies = [
     "typing-extensions>=4.0.0",
@@ -17,29 +17,10 @@ test = [
     "pytest>=7.0.0",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v"
-
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-strict_optional = true
 
 [tool.tox]
 legacy_tox_ini = """
@@ -67,11 +48,9 @@ commands =
 
 [testenv:lint]
 description = run linters
-skip_install = true
 deps =
-    black>=22.0.0
     ruff>=0.1.0
 commands =
-    black {posargs:recursive_dataclasses tests}
-    ruff check {posargs:recursive_dataclasses tests}
+    ruff check recursive_dataclasses tests
+    ruff format recursive_dataclasses tests
 """

@@ -55,7 +55,7 @@ wheels = [
 [[package]]
 name = "recursive-dataclasses"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "typing-extensions" },
 ]
