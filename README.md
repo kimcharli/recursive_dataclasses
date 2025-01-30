@@ -1,4 +1,4 @@
-# Recursive Dataclasses
+# CK Recursive Dataclass
 
 A Python library that extends Python's dataclasses to support recursive serialization and deserialization of nested dataclass structures. This library makes it easy to work with complex, nested data structures while maintaining type safety and providing convenient conversion methods between dataclasses and dictionaries.
 
@@ -16,7 +16,7 @@ A Python library that extends Python's dataclasses to support recursive serializ
 ## Installation
 
 ```bash
-pip install recursive-dataclasses
+pip install ck-recursive-dataclass
 ```
 
 ## Quick Start
@@ -25,7 +25,7 @@ Here's a simple example of how to use recursive dataclasses:
 
 ```python
 from dataclasses import dataclass
-from recursive_dataclasses import RecursiveDataclass
+from ck_recursive_dataclass import RecursiveDataclass
 from typing import Optional, Dict
 
 @dataclass
@@ -113,8 +113,8 @@ The library is fully type-hinted and works well with mypy for static type checki
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/kimcharli/recursive_dataclasses.git
-cd recursive_dataclasses
+git clone https://github.com/kimcharli/ck_recursive_dataclass.git
+cd ck_recursive_dataclass
 ```
 
 2. Install development dependencies:

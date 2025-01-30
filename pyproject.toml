@@ -1,5 +1,5 @@
 [project]
-name = "recursive-dataclasses"
+name = "ck-recursive-dataclass"
 version = "0.1.0"
 description = "A Python library for recursively loading and updating dataclasses from nested dictionaries"
 readme = "README.md"
@@ -71,13 +71,13 @@ description = run type checks
 deps = 
     mypy>=1.0.0
 commands =
-    mypy recursive_dataclasses
+    mypy ck_recursive_dataclass
 
 [testenv:lint]
 description = run linters
 deps =
     ruff>=0.1.0
 commands =
-    ruff check recursive_dataclasses tests
-    ruff format recursive_dataclasses tests
+    ruff check ck_recursive_dataclass tests
+    ruff format ck_recursive_dataclass tests
 """

@@ -2,7 +2,7 @@ from typing import Optional, List, Dict
 from dataclasses import dataclass
 import pytest
 
-from recursive_dataclasses import RecursiveDataclass
+from ck_recursive_dataclass import RecursiveDataclass
 
 
 @dataclass
