@@ -8,6 +8,16 @@ license = { text = "MIT" }
 authors = [
     { name = "Charlie Kim", email = "kimcharli@gmail.com" }
 ]
+keywords = ["dataclasses", "recursive", "serialization", "deserialization", "nested"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "typing-extensions>=4.0.0",
 ]
@@ -16,6 +26,18 @@ dependencies = [
 test = [
     "pytest>=7.0.0",
 ]
+dev = [
+    "tox>=4.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "build",
+    "twine",
+]
+
+[project.urls]
+Homepage = "https://github.com/kimcharli/recursive_dataclasses"
+Repository = "https://github.com/kimcharli/recursive_dataclasses.git"
+Issues = "https://github.com/kimcharli/recursive_dataclasses/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -31,6 +53,11 @@ env_list =
     py312
     type
     lint
+
+[gh-actions]
+python =
+    3.11: py311, type, lint
+    3.12: py312
 
 [testenv]
 description = run unit tests
