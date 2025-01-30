@@ -1,8 +1,43 @@
 from dataclasses import fields, is_dataclass
-from typing import Any, Dict, Type, TypeVar, get_type_hints, Mapping, cast, Generic
+from typing import (
+    Any,
+    Dict,
+    Type,
+    TypeVar,
+    get_type_hints,
+    Mapping,
+    Generic,
+    List,
+    TypeGuard,
+    Protocol,
+    cast,
+    TypeAlias,
+    runtime_checkable,
+)
 from typing_extensions import get_origin, get_args
 
 T = TypeVar("T")
+
+
+@runtime_checkable
+class DataclassProtocol(Protocol):
+    """Protocol for dataclass instances."""
+
+    __dataclass_fields__: Dict[str, Any]
+
+
+DataclassType: TypeAlias = Type[DataclassProtocol]
+DataclassInstance: TypeAlias = DataclassProtocol
+
+
+def is_dataclass_type(cls: Any) -> TypeGuard[DataclassType]:
+    """Type guard to check if a class is a dataclass."""
+    return isinstance(cls, type) and is_dataclass(cls)
+
+
+def is_dataclass_instance(obj: Any) -> TypeGuard[DataclassInstance]:
+    """Type guard to check if an object is a dataclass instance."""
+    return is_dataclass(obj) and not isinstance(obj, type)
 
 
 class DataclassUpdater(Generic[T]):
@@ -20,8 +55,8 @@ class DataclassUpdater(Generic[T]):
         Returns:
             Updated dataclass instance
         """
-        if not is_dataclass(instance):
-            raise TypeError("Instance must be a dataclass")
+        if not is_dataclass_instance(instance):
+            raise TypeError("Instance must be a dataclass instance")
         if not isinstance(data, Mapping):
             raise TypeError("Data must be a mapping (dict-like object)")
 
@@ -40,16 +75,17 @@ class DataclassUpdater(Generic[T]):
                 setattr(instance, field_name, None)
                 continue
 
-            # Get the origin type (e.g., List from List[str])
             origin_type = get_origin(field_type) or field_type
 
-            if is_dataclass(origin_type):
+            if is_dataclass_type(origin_type):
                 # Handle nested dataclass
-                current_value = getattr(instance, field_name)
-                if current_value is None:
-                    current_value = origin_type()
-                if isinstance(field_value, dict):
-                    updated_value = DataclassUpdater.update(current_value, field_value)
+                if field_value is not None:
+                    current_value = getattr(instance, field_name)
+                    if current_value is None:
+                        current_value = origin_type()
+                    updated_value = DataclassUpdater[Any].update(
+                        current_value, field_value
+                    )
                     setattr(instance, field_name, updated_value)
                 else:
                     setattr(instance, field_name, field_value)
@@ -57,17 +93,19 @@ class DataclassUpdater(Generic[T]):
             elif origin_type in (list, tuple, set):
                 # Handle collections
                 item_type = get_args(field_type)[0]
-                if is_dataclass(item_type):
+                if is_dataclass_type(item_type):
                     # Handle collection of dataclasses
-                    new_value = []
+                    current_items: List[Any] = []
                     for item in field_value:
-                        if isinstance(item, dict):
-                            new_item = item_type()
-                            updated_item = DataclassUpdater.update(new_item, item)
-                            new_value.append(updated_item)
+                        if item is None:
+                            current_items.append(None)
                         else:
-                            new_value.append(item)
-                    setattr(instance, field_name, origin_type(new_value))
+                            new_instance = item_type()
+                            updated_instance = DataclassUpdater[Any].update(
+                                new_instance, item
+                            )
+                            current_items.append(updated_instance)
+                    setattr(instance, field_name, origin_type(current_items))
                 else:
                     # Handle collection of simple types
                     setattr(instance, field_name, origin_type(field_value))
@@ -75,17 +113,19 @@ class DataclassUpdater(Generic[T]):
             elif origin_type is dict:
                 # Handle dictionaries
                 key_type, value_type = get_args(field_type)
-                if is_dataclass(value_type):
+                if is_dataclass_type(value_type):
                     # Handle dict with dataclass values
-                    new_dict = {}
+                    current_dict: Dict[Any, Any] = {}
                     for k, v in field_value.items():
-                        if isinstance(v, dict):
-                            new_item = value_type()
-                            updated_item = DataclassUpdater.update(new_item, v)
-                            new_dict[k] = updated_item
+                        if v is None:
+                            current_dict[k] = None
                         else:
-                            new_dict[k] = v
-                    setattr(instance, field_name, new_dict)
+                            new_instance = value_type()
+                            updated_instance = DataclassUpdater[Any].update(
+                                new_instance, v
+                            )
+                            current_dict[k] = updated_instance
+                    setattr(instance, field_name, current_dict)
                 else:
                     # Handle dict with simple types
                     setattr(instance, field_name, field_value)
@@ -108,7 +148,9 @@ def update_dataclass(instance: T, data: Dict[str, Any]) -> T:
     Returns:
         Updated dataclass instance
     """
-    return DataclassUpdater.update(instance, data)
+    if not is_dataclass(instance):
+        raise TypeError("Instance must be a dataclass")
+    return cast(T, DataclassUpdater[Any].update(instance, data))
 
 
 def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:

@@ -38,16 +38,20 @@ def test_nested_dataclass():
         "metadata": {"department": "Engineering", "role": "Developer"},
     }
 
-    # Create a new Person instance from dictionary
+    # Test from_dict function
     person = from_dict(Person, data)
 
     # Verify the data
     assert person.name == "John Doe"
     assert person.age == 30
+    assert isinstance(person.address, Address)
     assert person.address.street == "123 Main St"
     assert person.address.city == "New York"
+    assert isinstance(person.contacts, list)
     assert len(person.contacts) == 2
+    assert isinstance(person.contacts[0], Contact)
     assert person.contacts[0].email == "john@example.com"
+    assert isinstance(person.metadata, dict)
     assert person.metadata["department"] == "Engineering"
 
     # Test updating existing instance
@@ -57,6 +61,7 @@ def test_nested_dataclass():
         "contacts": [{"email": "new@example.com", "phone": "555-555-5555"}],
     }
 
+    # Test update_dataclass function
     person = update_dataclass(person, update_data)
 
     # Verify updates
@@ -65,6 +70,26 @@ def test_nested_dataclass():
     # Original data should be preserved when not updated
     assert person.address.street == "123 Main St"
     assert person.contacts[0].email == "new@example.com"
+
+    # Test None handling
+    null_data = {"address": None, "contacts": None, "metadata": None}
+    person = update_dataclass(person, null_data)
+    assert person.address is None
+    assert person.contacts is None
+    assert person.metadata is None
+
+    # Test error handling
+    try:
+        update_dataclass("not a dataclass", {})
+        assert False, "Should raise TypeError"
+    except TypeError:
+        pass
+
+    try:
+        update_dataclass(person, "not a dict")
+        assert False, "Should raise TypeError"
+    except TypeError:
+        pass
 
 
 if __name__ == "__main__":
