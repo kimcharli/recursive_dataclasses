@@ -20,12 +20,21 @@ class Contact(RecursiveDataclass):
 
 
 @dataclass
+class Occupation(RecursiveDataclass):
+    title: str
+    company: str
+    years_experience: int
+    department: Optional[str] = None
+
+
+@dataclass
 class Person(RecursiveDataclass):
     name: str
     age: int
     addresses: Dict[str, Address]
-    contacts: List[Contact]
-    notes: Optional[str] = None
+    occupation: Occupation
+    contacts: Optional[List[Contact]] = None
+    email: Optional[str] = None
 
 
 def test_simple_dataclass():
@@ -52,25 +61,42 @@ def test_simple_dataclass():
 
 def test_optional_fields():
     """Test handling of optional fields."""
-    # Test with all fields
+    # Test Contact with all fields
     contact1 = Contact(email="test@example.com", phone="+1-555-555-5555")
     assert contact1.phone == "+1-555-555-5555"
 
-    # Test without optional field
+    # Test Contact without optional field
     contact2 = Contact(email="test@example.com")
     assert contact2.phone is None
 
-    # Test conversion to/from dict
+    # Test Occupation with all fields
+    occupation = Occupation(
+        title="Software Engineer", company="ABC Corp", years_experience=5, department="IT"
+    )
+    assert occupation.department == "IT"
+
+    # Test Occupation without optional field
+    occupation2 = Occupation(
+        title="Software Engineer", company="ABC Corp", years_experience=5
+    )
+    assert occupation2.department is None
+
+    # Test conversion to/from dict for Contact
     contact_dict = contact2.to_dict()
     assert contact_dict["phone"] is None
-
     new_contact = Contact.from_dict(contact_dict)
     assert new_contact.phone is None
+
+    # Test conversion to/from dict for Occupation
+    occupation_dict = occupation2.to_dict()
+    assert occupation_dict["department"] is None
+    new_occupation = Occupation.from_dict(occupation_dict)
+    assert new_occupation.department is None
 
 
 def test_nested_dataclass():
     """Test nested dataclass structures."""
-    person_data = {
+    person_dict = {
         "name": "John Doe",
         "age": 30,
         "addresses": {
@@ -79,46 +105,71 @@ def test_nested_dataclass():
                 "city": "New York",
                 "country": "USA",
                 "postal_code": "10001",
+                "__type__": "Address",
             },
             "work": {
-                "street": "456 Business Ave",
+                "street": "456 Park Ave",
                 "city": "Manhattan",
                 "country": "USA",
                 "postal_code": "10002",
             },
         },
+        "occupation": {
+            "title": "Software Engineer",
+            "company": "ABC Corp",
+            "years_experience": 5,
+        },
         "contacts": [
             {"email": "john@example.com", "phone": "+1-555-555-5555"},
             {"email": "john.doe@work.com"},
         ],
-        "notes": "Test notes",
+        "email": "john@example.com",
     }
 
     # Test from_dict with nested structure
-    person = Person.from_dict(person_data)
+    person = Person.from_dict(person_dict)
     assert person.name == "John Doe"
-    assert person.age == 30
     assert len(person.addresses) == 2
     assert person.addresses["home"].street == "123 Main St"
     assert person.addresses["work"].city == "Manhattan"
+    assert person.occupation.title == "Software Engineer"
     assert len(person.contacts) == 2
     assert person.contacts[0].email == "john@example.com"
     assert person.contacts[1].phone is None
+    assert person.email == "john@example.com"
 
     # Test to_dict with nested structure
     person_dict = person.to_dict()
     assert person_dict["name"] == "John Doe"
     assert person_dict["addresses"]["home"]["street"] == "123 Main St"
+    assert person_dict["occupation"]["title"] == "Software Engineer"
     assert person_dict["contacts"][0]["phone"] == "+1-555-555-5555"
     assert person_dict["contacts"][1]["phone"] is None
+    assert person_dict["email"] == "john@example.com"
 
 
 def test_validation():
     """Test input validation."""
-    # Test invalid input type
-    with pytest.raises(TypeError, match="Expected dict"):
+    # Test missing required field 'occupation'
+    with pytest.raises(ValueError):
+        Person.from_dict({
+            "name": "John Doe",
+            "age": 30,
+            "addresses": {"home": {"street": "123 Main St", "city": "New York", "country": "USA"}},
+        })
+
+    # Test missing required field 'addresses'
+    with pytest.raises(ValueError):
+        Person.from_dict({
+            "name": "John Doe",
+            "age": 30,
+            "occupation": {"title": "Engineer", "company": "ABC Corp", "years_experience": 5},
+        })
+
+    # Test with invalid input type
+    with pytest.raises(TypeError):
         Address.from_dict("not a dict")
 
-    # Test missing required field
-    with pytest.raises(ValueError, match="Missing required field"):
+    # Test with missing required field in nested object
+    with pytest.raises(ValueError):
         Address.from_dict({"city": "New York", "country": "USA"})

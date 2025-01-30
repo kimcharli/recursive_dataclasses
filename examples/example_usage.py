@@ -1,6 +1,7 @@
-from typing import Optional, List, Dict
 from dataclasses import dataclass
-from recursive_dataclasses import RecursiveDataclass
+from ck_recursive_dataclass import RecursiveDataclass
+from typing import Optional, Dict
+
 
 @dataclass
 class Address(RecursiveDataclass):
@@ -9,63 +10,70 @@ class Address(RecursiveDataclass):
     country: str
     postal_code: Optional[str] = None
 
+
 @dataclass
-class Contact(RecursiveDataclass):
-    email: str
-    phone: Optional[str] = None
+class Occupation(RecursiveDataclass):
+    title: str
+    company: str
+    years_experience: int
+    department: Optional[str] = None
+
 
 @dataclass
 class Person(RecursiveDataclass):
     name: str
     age: int
-    addresses: Dict[str, Address]  # Map of address type (e.g., 'home', 'work') to Address
-    contacts: List[Contact]
-    notes: Optional[str] = None
+    addresses: Dict[str, Address]
+    occupation: Occupation
+    email: Optional[str] = None
 
-# Example usage
-if __name__ == "__main__":
-    # Create a nested dictionary
-    person_data = {
-        "name": "John Doe",
-        "age": 30,
-        "addresses": {
-            "home": {
-                "street": "123 Main St",
-                "city": "New York",
-                "country": "USA",
-                "postal_code": "10001"
-            },
-            "work": {
-                "street": "456 Business Ave",
-                "city": "Manhattan",
-                "country": "USA",
-                "postal_code": "10002"
-            }
-        },
-        "contacts": [
-            {
-                "email": "john@example.com",
-                "phone": "+1-555-555-5555"
-            },
-            {
-                "email": "john.doe@work.com"
-            }
-        ],
-        "notes": "Prefers email communication"
-    }
 
-    # Load the dictionary into a Person instance
-    person = Person.from_dict(person_data)
-    print("\nLoaded Person instance:")
-    print(f"Name: {person.name}")
-    print(f"Age: {person.age}")
-    print("Addresses:")
-    for addr_type, addr in person.addresses.items():
-        print(f"  {addr_type.title()}: {addr.street}, {addr.city}")
-    print(f"Contacts: {[contact.email for contact in person.contacts]}")
-    print(f"Notes: {person.notes}")
+def main():
+    # Create instances
+    home_address = Address(
+        street="123 Home St",
+        city="Hometown",
+        country="Homeland",
+        postal_code="12345"
+    )
 
-    # Convert back to dictionary
+    work_address = Address(
+        street="456 Work Ave",
+        city="Workville",
+        country="Workland"
+    )
+
+    occupation = Occupation(
+        title="Senior Developer",
+        company="Tech Corp",
+        years_experience=5,
+        department="Engineering"
+    )
+
+    # Create a person with multiple addresses and occupation
+    person = Person(
+        name="John Doe",
+        age=30,
+        addresses={"home": home_address, "work": work_address},
+        occupation=occupation,
+        email="john@example.com"
+    )
+
+    # Convert to dictionary
     person_dict = person.to_dict()
-    print("\nDumped dictionary:")
+    print("Person as dictionary:")
     print(person_dict)
+    print("\nPerson's occupation:")
+    print(person_dict["occupation"])
+
+    # Create from dictionary
+    new_person = Person.from_dict(person_dict)
+    print("\nRecreated person's occupation:")
+    print(f"Title: {new_person.occupation.title}")
+    print(f"Company: {new_person.occupation.company}")
+    print(f"Years Experience: {new_person.occupation.years_experience}")
+    print(f"Department: {new_person.occupation.department}")
+
+
+if __name__ == "__main__":
+    main()
